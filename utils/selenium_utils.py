@@ -1,9 +1,9 @@
 from selenium import webdriver
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
-from webdriver_manager.firefox import GeckoDriverManager
 import time
 import os
+import subprocess
 
 class FirefoxPDFViewer:
     def __init__(self, headless=False):
@@ -12,47 +12,63 @@ class FirefoxPDFViewer:
         self.setup_driver()
     
     def setup_driver(self):
-        """Configura el driver de Firefox UNA SOLA VEZ"""
+        """Configuración MÍNIMA ABSOLUTA - SIN webdriver-manager"""
         try:
+            print("   🧹 Limpiando procesos anteriores...")
+            subprocess.run(["pkill", "-f", "firefox"], capture_output=True)
+            subprocess.run(["pkill", "-f", "geckodriver"], capture_output=True)
+            time.sleep(3)
+            
             firefox_options = Options()
             
+            # SOLO una opción esencial
             if self.headless:
                 firefox_options.add_argument("--headless")
             
-            # Configuración optimizada para PDFs
-            firefox_options.set_preference("browser.download.folderList", 2)
-            firefox_options.set_preference("browser.download.manager.showWhenStarting", False)
-            firefox_options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/pdf")
+            # SOLO una preferencia esencial
             firefox_options.set_preference("pdfjs.disabled", False)
-            firefox_options.set_preference("browser.tabs.remote.autostart", False)
             
-            # OPTIMIZACIONES PARA MÁXIMA VELOCIDAD
-            firefox_options.set_preference("browser.startup.homepage", "about:blank")
-            firefox_options.set_preference("browser.startup.page", 0)
-            firefox_options.set_preference("browser.shell.checkDefaultBrowser", False)
+            # NADA MÁS - configuración mínima absoluta
+            print("   🔧 Inicializando Firefox ESR...")
             
-            # Deshabilitar cache para forzar recarga
-            firefox_options.set_preference("browser.cache.disk.enable", False)
-            firefox_options.set_preference("browser.cache.memory.enable", False)
-            firefox_options.set_preference("browser.cache.offline.enable", False)
-            firefox_options.set_preference("network.http.use-cache", False)
+            # Usar SOLO GeckoDriver del sistema, SIN webdriver-manager
+            service = Service("/usr/local/bin/geckodriver")
             
-            # Usar webdriver-manager
-            service = Service(GeckoDriverManager().install())
-            self.driver = webdriver.Firefox(service=service, options=firefox_options)
+            self.driver = webdriver.Firefox(
+                service=service, 
+                options=firefox_options
+            )
             
-            # Maximizar ventana UNA SOLA VEZ
-            self.driver.maximize_window()
-            print("   ✅ Firefox configurado (MISMA PESTAÑA)")
+            print("   ✅ Firefox ESR inicializado (CONFIGURACIÓN MÍNIMA)")
             
         except Exception as e:
-            print(f"   ❌ Error al configurar Firefox: {e}")
-            raise
+            print(f"   ❌ Error CRÍTICO: {e}")
+            self._last_resort()
+    
+    def _last_resort(self):
+        """Último recurso: diagnóstico completo"""
+        print("   🚨 EJECUTANDO DIAGNÓSTICO COMPLETO:")
+        
+        # Verificar Firefox
+        result = subprocess.run(["which", "firefox-esr"], capture_output=True, text=True)
+        print(f"      Firefox ESR path: {result.stdout.strip()}")
+        
+        # Verificar GeckoDriver
+        result = subprocess.run(["which", "geckodriver"], capture_output=True, text=True)
+        print(f"      GeckoDriver path: {result.stdout.strip()}")
+        
+        # Verificar permisos
+        result = subprocess.run(["ls", "-la", "/usr/local/bin/geckodriver"], capture_output=True, text=True)
+        print(f"      GeckoDriver permisos: {result.stdout.strip()}")
+        
+        # Verificar espacio en disco
+        result = subprocess.run(["df", "-h", "/tmp"], capture_output=True, text=True)
+        print(f"      Espacio en /tmp: {result.stdout.strip().split()[-2] if result.stdout else 'N/A'}")
+        
+        raise Exception("No se pudo inicializar Firefox después de diagnóstico completo")
     
     def cambiar_pdf_en_misma_pestana(self, ruta_pdf, numero_pdf, total_pdfs):
-        """
-        Cambia a un NUEVO PDF en la MISMA pestaña (SUPER RÁPIDO)
-        """
+        """Método para cambiar PDFs - se mantiene igual"""
         if not self.driver:
             print("   ❌ Firefox no inicializado")
             return
@@ -62,17 +78,13 @@ class FirefoxPDFViewer:
             return
         
         try:
-            # Convertir ruta a formato URL
             ruta_absoluta = os.path.abspath(ruta_pdf)
-            url_pdf = f"file:///{ruta_absoluta}".replace('\\', '/')
+            url_pdf = f"file://{ruta_absoluta}"
             
             print(f"   📂 [{numero_pdf}/{total_pdfs}] Cargando: {os.path.basename(ruta_pdf)}")
             
-            # NAVEGAR DIRECTAMENTE al nuevo PDF en la MISMA pestaña
             self.driver.get(url_pdf)
-            
-            # Espera mínima para que cargue (puedes ajustar este tiempo)
-            time.sleep(1.5)
+            time.sleep(2)
             
             print(f"   ✅ PDF cargado - Presiona ENTER para siguiente...")
             
@@ -80,12 +92,12 @@ class FirefoxPDFViewer:
             print(f"   ❌ Error al cargar el PDF: {e}")
     
     def mantener_ventana_abierta(self):
-        """Mantiene la ventana abierta entre documentos"""
-        # No hace nada - la ventana ya está abierta
         pass
     
     def cerrar_driver(self):
-        """Cierra Firefox completamente (solo al final)"""
         if self.driver:
-            self.driver.quit()
-            print("   ✅ Firefox cerrado")
+            try:
+                self.driver.quit()
+                print("   ✅ Firefox cerrado")
+            except:
+                pass

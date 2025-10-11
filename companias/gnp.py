@@ -138,14 +138,18 @@ TIPOS_DOCUMENTOS = {
                 "/html/body/div[1]/div[2]/div[2]/div[2]/div[1]/div[2]/span[68]", 
                 "/html/body/div[1]/div[2]/div[2]/div[2]/div/div[2]/span[4]",
                 "/html/body/div[1]/div[2]/div[2]/div[2]/div/div[2]/span[5]",
-                "/html/body/div[1]/div[2]/div[2]/div[2]/div[1]/div[2]/span[124]"
+                "/html/body/div[1]/div[2]/div[2]/div[2]/div[1]/div[2]/span[124]",
+                "/html/body/div[1]/div[2]/div[2]/div[2]/div[1]/div[2]/span[9]",
+                "/html/body/div[1]/div[2]/div[2]/div[2]/div[1]/div[2]/span[96]",
+                "/html/body/div[1]/div[2]/div[2]/div[2]/div[1]/div[2]/span[94]"
                 
             ],
             "textos": [
                 "Endoso",
-               "ENDOSO \"D\"",
-               "ENDOSO \"A\"",
-               "ENDOSO \"B\"",
+                "ENDOSO B",
+                "ENDOSO \"D\"",
+                "ENDOSO \"A\"",
+                "ENDOSO \"B\"",
                 "ENDOSO",
                 "Desde Vigencia del endoso Hasta"
             ]

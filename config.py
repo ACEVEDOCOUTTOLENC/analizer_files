@@ -1,7 +1,7 @@
 import os
 
 # Configuración de rutas - CORREGIDA
-BASE_DIR = r"C:\laragon\www\analizer_files\data"
+BASE_DIR = r"/mnt/desarrollo/storage/data"
 EXCEL_PATTERN = "produccion_final_*.xlsx"
 PDF_SEARCH_PATTERNS = ["*.pdf", "**/*.pdf", "produccion_final/*.pdf"]
 

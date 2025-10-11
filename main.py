@@ -60,7 +60,10 @@ def main():
         print("❌ No se encontraron archivos PDF")
         return
     
+    pdfs.sort(key=os.path.basename, reverse=True)
+    
     print(f"🎯 Se cargarán {len(pdfs)} archivos PDF")
+    print("📅 ORDEN: DESCENDENTE (más reciente → más antiguo)")
     print("💡 Se usa UNA SOLA pestaña - Solo cambia el documento")
     print("⚡ VELOCIDAD MÁXIMA: No se cierra/reabre el navegador")
     print("=" * 60)

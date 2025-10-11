@@ -28,7 +28,8 @@ def procesar_con_excel(pdf_path, datos_extraidos, cia_detectada, ramo, tipo_doc)
         # 3. Buscar coincidencias
         registro_coincidente = buscar_coincidencia(df, datos_extraidos, cia_detectada, ramo, tipo_doc)
         
-        if not registro_coincidente:
+        # 🔥 CORRECCIÓN COMPLETA: Verificar si no hay coincidencia
+        if registro_coincidente is None or (hasattr(registro_coincidente, 'empty') and registro_coincidente.empty):
             print("❌ No se encontró coincidencia en Excel")
             return False
         
@@ -70,7 +71,7 @@ def procesar_con_excel(pdf_path, datos_extraidos, cia_detectada, ramo, tipo_doc)
     
 def encontrar_excel_reciente():
     """Encuentra el archivo Excel más reciente en produccion_final"""
-    excel_dir = r"C:\laragon\www\analizer_files\data\produccion_final"
+    excel_dir = r"/mnt/desarrollo/storage/data/produccion_final"
     
     if not os.path.exists(excel_dir):
         print(f"❌ Directorio no existe: {excel_dir}")
@@ -380,7 +381,7 @@ def mover_archivo(pdf_path_original, nuevo_nombre):
     
     # Crear carpeta de destino
     fecha_hoy = datetime.now().strftime('%Y%m%d')
-    package_dir = os.path.join(r"C:\laragon\www\analizer_files\data\package", fecha_hoy)
+    package_dir = os.path.join(r"/mnt/desarrollo/storage/data/package", fecha_hoy)
     
     try:
         os.makedirs(package_dir, exist_ok=True)
