@@ -1,5 +1,22 @@
+# --- Librerías de análisis y manejo de datos ---
 pandas>=1.5.0
 openpyxl>=3.0.0
+
+# --- Selenium (automatización de navegador) ---
 selenium>=4.10.0
 webdriver-manager>=3.8.0
-PyMuPDF
+
+# --- Procesamiento de PDF ---
+PyMuPDF>=1.23.5   # (fitz)
+
+# --- OCR y manejo de imágenes ---
+pillow>=10.0.0     # Para manipular imágenes
+pytesseract>=0.3.10 # Para extracción OCR
+opencv-python>=4.7.0 # Opcional pero útil para limpiar imágenes OCR
+
+# --- Utilidades ---
+numpy>=1.25.0       # Algunas dependencias de imagen lo requieren
+tqdm>=4.65.0        # Barra de progreso (opcional pero útil)
+
+# --- Compatibilidad con entornos ---
+python-dotenv>=1.0.0  # Si usas .env (por ejemplo para BASE_DIR u otras rutas)
