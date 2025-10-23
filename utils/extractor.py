@@ -372,18 +372,12 @@ def procesar_directorio_con_estadisticas(ruta_directorio, mostrar_todo=True, lim
             else:
                 print("❌ No se pudo cargar el documento en el visor.")
 
-        # 💬 Preguntar si anotar
-        accion = interfaz_global.esperar_accion_usuario()
-
-        if accion == 'saltar':
-            print("⏭️ Saltando anotación de este documento.")
-            continue  # pasa al siguiente archivo
         try:
             anotador = AnotadorInteligente(ruta)
             anotador.set_metadata(compania=compania_detectada, ramo=ramo)
             
             # 🎯 EJECUTAR ANOTACIÓN Y CAPTURAR RESULTADO
-            anotacion_completada = interfaz_global.ejecutar_anotacion_continua(anotador)
+            anotacion_completada = interfaz_global.ejecutar_anotacion_continua(anotador, compania_detectada, ramo)
             
             if anotacion_completada:
                 archivos_anotados += 1

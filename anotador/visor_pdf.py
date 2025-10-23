@@ -10,7 +10,9 @@ import queue
 import time
 from tkinter import simpledialog  # ✅ para poder editar texto después
 import sys
-
+from PIL import Image, ImageEnhance, ImageFilter
+import pytesseract
+import io
 
 config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config')
 if config_path not in sys.path:
@@ -300,38 +302,6 @@ class VisorPDF:
             'coordenadas': {'x': x_pdf, 'y': y_pdf, 'pagina': self.pagina_actual}
         })
 
-    def extraer_texto_en_area(self, rect):
-        """
-        Extrae el texto del área seleccionada en el visor (coordenadas del canvas)
-        transformándolas a coordenadas del PDF.
-        """
-        if not self.doc:
-            return ""
-    
-        pagina = self.doc[self.pagina_actual]
-    
-        # Tamaño real del PDF
-        pdf_width, pdf_height = pagina.rect.width, pagina.rect.height
-    
-        # Tamaño actual del canvas
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
-    
-        # Factores de escala (canvas → PDF)
-        scale_x = pdf_width / canvas_width
-        scale_y = pdf_height / canvas_height
-    
-        x0, y0, x1, y1 = rect
-        pdf_rect = fitz.Rect(
-            x0 * scale_x,
-            y0 * scale_y,
-            x1 * scale_x,
-            y1 * scale_y
-        )
-    
-        texto = pagina.get_text("text", clip=pdf_rect)
-        return texto.strip()
-
     def _on_close_click(self):
         """Cierre seguro desde la ventana."""
         print("\n🧩 Cerrando visor desde la ventana.")
@@ -406,10 +376,12 @@ class VisorPDF:
             self.canvas.coords(self.overlay_id, self.start_x, self.start_y, curX, curY)
     
     def _finalizar_seleccion(self, event):
-        """Cuando se suelta el botón: capturar texto dentro del área."""
+        """Cuando se suelta el botón: capturar texto usando el extractor poderoso."""
         if not hasattr(self, "start_x") or not hasattr(self, "start_y"):
+            print("❌ No hay coordenadas de inicio para la selección")
             return
-    
+        
+        # Obtener coordenadas finales del rectángulo
         end_x = self.canvas.canvasx(event.x)
         end_y = self.canvas.canvasy(event.y)
         rect_canvas = (
@@ -418,6 +390,8 @@ class VisorPDF:
             max(self.start_x, end_x),
             max(self.start_y, end_y)
         )
+        
+        print(f"🔍 Selección en canvas: {rect_canvas}")
     
         # Convertir canvas(px) -> PDF pts usando zoom
         x0_pdf = rect_canvas[0] / self.zoom
@@ -425,14 +399,13 @@ class VisorPDF:
         x1_pdf = rect_canvas[2] / self.zoom
         y1_pdf = rect_canvas[3] / self.zoom
         rect_pdf = fitz.Rect(x0_pdf, y0_pdf, x1_pdf, y1_pdf)
+        
+        print(f"📏 Área PDF: ({x0_pdf:.1f}, {y0_pdf:.1f}, {x1_pdf:.1f}, {y1_pdf:.1f})")
     
-        # Extraer texto (llamamos a la función que usa rect en pts)
-        texto = ""
-        try:
-            texto = self.doc.load_page(self.pagina_actual).get_text("text", clip=rect_pdf).strip()
-            texto = texto.replace("\n", " ").strip()
-        except Exception as e:
-            print(f"⚠️ Error extrayendo texto del área: {e}")
+        # USAR EXTRACTOR PODEROSO EN LUGAR DE EXTRACCIÓN BÁSICA
+        texto = self._extraer_texto_con_extractor_poderoso(rect_pdf)
+        
+        print(f"✅ Texto extraído: '{texto}'")
     
         coordenadas = {
             "pagina": self.pagina_actual,
@@ -442,33 +415,21 @@ class VisorPDF:
     
         datos_click = {"texto": texto, "coordenadas": coordenadas}
     
-        # En lugar de bloquear o pedir input, dejamos el dato para que la hebra principal lo procese.
-        # callback debe ser no bloqueante y solo encolar/almacenar datos.
+        # Enviar datos al callback principal
         if self.callback_click:
             try:
-                # Envolvemos en after(0) para evitar llamadas extrañas desde eventos complejos
+                # Usar after(0) para evitar problemas de hilos
                 self.root.after(0, lambda: self.callback_click(datos_click))
             except Exception:
-                # fallback directo si after no funciona
+                # Fallback directo si after falla
                 try:
                     self.callback_click(datos_click)
                 except Exception as e:
-                    print(f"⚠️ callback fallo: {e}")
+                    print(f"⚠️ Error en callback: {e}")
     
         # Confirmación visual
-        if hasattr(self, "rect_id") and self.rect_id:
-            self.canvas.itemconfig(self.rect_id, outline="green", dash=())
-        if hasattr(self, "overlay_id") and self.overlay_id:
-            self.canvas.itemconfig(self.overlay_id, fill="green", stipple="gray25")
-        confirm_text = self.canvas.create_text(
-            (rect_canvas[0] + rect_canvas[2]) / 2,
-            (rect_canvas[1] + rect_canvas[3]) / 2 - 10,
-            text="✅ Capturado",
-            fill="green",
-            font=("Arial", 12, "bold")
-        )
-        self.canvas.after(1000, lambda: self.canvas.delete(confirm_text))
-
+        self._mostrar_confirmacion_visual(rect_canvas)
+    
     def extraer_text_en_area(self, rect_canvas):
         """
         rect_canvas: (x0, y0, x1, y1) en pixeles del canvas (coinciden con pixmap)
@@ -489,3 +450,122 @@ class VisorPDF:
         except Exception as e:
             print(f"⚠️ Error al extraer texto del área: {e}")
             return ""
+        
+    
+    def _extraer_texto_con_extractor_poderoso(self, rect_pdf):
+        """
+        Usa la lógica robusta del extractor existente para extraer texto.
+        Combina texto embebido + OCR automáticamente.
+        """
+        try:
+            pagina = self.doc.load_page(self.pagina_actual)
+            
+            # PRIMERO: Intentar extracción de texto embebido
+            texto_embebido = pagina.get_text("text", clip=rect_pdf).strip()
+            texto_embebido = texto_embebido.replace("\n", " ").strip()
+            
+            print(f"🔍 Texto embebido crudo: '{texto_embebido}'")
+            
+            # Verificar si el texto es legible (usando la lógica de tu extractor)
+            if texto_embebido and self._es_texto_legible(texto_embebido):
+                print("✅ Usando texto embebido legible")
+                return texto_embebido
+            
+            # SEGUNDO: Si no hay texto legible, aplicar OCR
+            print("🔄 Texto embebido no legible, aplicando OCR...")
+            texto_ocr = self._aplicar_ocr_en_area(pagina, rect_pdf)
+            
+            return texto_ocr.strip()
+            
+        except Exception as e:
+            print(f"❌ Error en extractor poderoso: {e}")
+            return ""
+
+    def _es_texto_legible(self, texto, min_alpha_ratio=0.45, min_words=2):
+        """
+        Versión simplificada de tu función es_texto_legible del extractor.
+        Detecta si el texto parece ser legible y no corrupto.
+        """
+        if not texto or not texto.strip():
+            return False
+    
+        palabras = texto.strip().split()
+        if len(palabras) < min_words:
+            return False
+    
+        total_chars = len(texto)
+        letras = sum(1 for c in texto if c.isalpha())
+        alpha_ratio = letras / (total_chars + 1e-9)
+    
+        # Detectar caracteres no imprimibles o corruptos
+        no_print = sum(1 for c in texto if ord(c) < 32 and c not in "\n\r\t")
+        if no_print > total_chars * 0.1:
+            return False
+    
+        return alpha_ratio >= min_alpha_ratio
+    
+    def _aplicar_ocr_en_area(self, pagina, rect_pdf, dpi=300):
+        """
+        Aplica OCR robusto en el área específica, similar a tu extractor.
+        """
+        try:
+            # Renderizar el área en alta resolución
+            zoom_ocr = 2.0  # Buena relación calidad/velocidad
+            mat = fitz.Matrix(zoom_ocr, zoom_ocr)
+            
+            # Crear pixmap solo del área de interés
+            pix = pagina.get_pixmap(matrix=mat, clip=rect_pdf)
+            
+            if pix.width <= 10 or pix.height <= 10:
+                print("⚠️ Área de OCR demasiado pequeña")
+                return ""
+                
+            img_bytes = pix.tobytes("png")
+            img = Image.open(io.BytesIO(img_bytes)).convert("L")
+            
+            # Mejorar imagen para OCR (como hace tu extractor)
+            from PIL import ImageEnhance, ImageFilter
+            
+            # Mejorar contraste
+            img = ImageEnhance.Contrast(img).enhance(2.0)
+            # Reducir ruido
+            img = img.filter(ImageFilter.MedianFilter(size=3))
+            # Mejorar nitidez
+            img = img.filter(ImageFilter.SHARPEN)
+            
+            # Aplicar OCR con configuración robusta
+            config_ocr = '--psm 6 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-.,$%()/ '
+            texto_ocr = pytesseract.image_to_string(img, lang='spa', config=config_ocr)
+            
+            # Limpiar resultado
+            texto_limpio = ' '.join(texto_ocr.strip().split())
+            print(f"🔍 OCR extrajo: '{texto_limpio}'")
+            
+            return texto_limpio
+            
+        except ImportError:
+            print("❌ pytesseract no disponible. Instala: pip install pytesseract")
+            return ""
+        except Exception as e:
+            print(f"❌ Error en OCR: {e}")
+            return ""
+    
+    def _mostrar_confirmacion_visual(self, rect_canvas):
+        """Muestra confirmación visual de la captura"""
+        # Cambiar color del rectángulo a verde
+        if hasattr(self, "rect_id") and self.rect_id:
+            self.canvas.itemconfig(self.rect_id, outline="green", dash=())
+        if hasattr(self, "overlay_id") and self.overlay_id:
+            self.canvas.itemconfig(self.overlay_id, fill="green", stipple="gray25")
+        
+        # Mostrar texto de confirmación
+        confirm_text = self.canvas.create_text(
+            (rect_canvas[0] + rect_canvas[2]) / 2,
+            (rect_canvas[1] + rect_canvas[3]) / 2 - 10,
+            text="✅ Capturado",
+            fill="green",
+            font=("Arial", 12, "bold")
+        )
+        
+        # Eliminar confirmación después de 1 segundo
+        self.canvas.after(1000, lambda: self.canvas.delete(confirm_text))
